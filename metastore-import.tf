@@ -133,6 +133,13 @@ resource "yandex_resourcemanager_folder_iam_binding" "dataproc-agent" {
   members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
 }
 
+# Assign the dataproc.provisioner role to the Data Proc service account
+resource "yandex_resourcemanager_folder_iam_binding" "dataproc-provisioner" {
+  folder_id = local.folder_id
+  role      = "dataproc.provisioner"
+  members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
+}
+
 # Assign the storage.admin role to the Data Proc service account
 resource "yandex_resourcemanager_folder_iam_binding" "storage-admin" {
   folder_id = local.folder_id
@@ -160,7 +167,7 @@ resource "yandex_storage_bucket" "dataproc-bucket" {
 
 resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
   description        = "Data Proc source cluster"
-  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent]
+  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent,yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
   bucket             = yandex_storage_bucket.dataproc-bucket.id
   security_group_ids = [yandex_vpc_security_group.dataproc-security-group.id]
   name               = local.dataproc_source_name
@@ -209,7 +216,7 @@ resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
 
 resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
   description        = "Data Proc target cluster"
-  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent]
+  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent,yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
   bucket             = yandex_storage_bucket.dataproc-bucket.id
   security_group_ids = [yandex_vpc_security_group.dataproc-security-group.id]
   name               = local.dataproc_target_name
