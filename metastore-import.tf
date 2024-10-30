@@ -1,37 +1,37 @@
-# Infrastructure for transfering data between two Data Proc clusters
+# Infrastructure for transferring data between two Yandex Data Processing clusters
 #
 # RU: https://cloud.yandex.ru/docs/data-proc/tutorials/metastore-import
 # EN: https://cloud.yandex.com/en/docs/data-proc/tutorials/metastore-import
 #
-# Set the configuration of the Data Proc clusters
+# Set the configuration of the Yandex Data Processing clusters
 
 # Specify the following settings:
 locals {
   folder_id  = "" # Your cloud folder ID, same as for provider
-  dp_ssh_key = "" # Аbsolute path to an SSH public key for the Data Proc clusters
+  dp_ssh_key = "" # Аbsolute path to an SSH public key for the Yandex Data Processing clusters
 
   # The following settings are predefined. Change them only if necessary.
   network_name         = "dataproc-network" # Name of the network
   nat_name             = "dataproc-nat" # Name of the NAT gateway
   subnet_name          = "dataproc-subnet-a" # Name of the subnet
   sa_name              = "dataproc-s3-sa" # Name of the service account
-  dataproc_source_name = "dataproc-source" # Name of the Data Proc source cluster
-  dataproc_target_name = "dataproc-target" # Name of the Data Proc target cluster
+  dataproc_source_name = "dataproc-source" # Name of the Yandex Data Processing source cluster
+  dataproc_target_name = "dataproc-target" # Name of the Yandex Data Processing target cluster
   bucket_name          = "dataproc-bucket" # Name of the Object Storage bucket
 }
 
 resource "yandex_vpc_network" "dataproc_network" {
-  description = "Network for Data Proc and Metastore"
+  description = "Network for Yandex Data Processing and Metastore"
   name        = local.network_name
 }
 
-# NAT gateway for Data Proc and Metastore
+# NAT gateway for Yandex Data Processing and Metastore
 resource "yandex_vpc_gateway" "dataproc_nat" {
   name = local.nat_name
   shared_egress_gateway {}
 }
 
-# Routing table for Data Proc and Metastore
+# Routing table for Yandex Data Processing and Metastore
 resource "yandex_vpc_route_table" "dataproc_rt" {
   network_id = yandex_vpc_network.dataproc_network.id
 
@@ -42,7 +42,7 @@ resource "yandex_vpc_route_table" "dataproc_rt" {
 }
 
 resource "yandex_vpc_subnet" "dataproc_subnet-a" {
-  description    = "Subnet for Data Proc and Metastore"
+  description    = "Subnet for Yandex Data Processing and Metastore"
   name           = local.subnet_name
   zone           = "ru-central1-a"
   network_id     = yandex_vpc_network.dataproc_network.id
@@ -51,7 +51,7 @@ resource "yandex_vpc_subnet" "dataproc_subnet-a" {
 }
 
 resource "yandex_vpc_security_group" "dataproc-security-group" {
-  description = "Security group for the Data Proc clusters"
+  description = "Security group for the Yandex Data Processing clusters"
   network_id  = yandex_vpc_network.dataproc_network.id
 
   ingress {
@@ -122,25 +122,25 @@ resource "yandex_vpc_security_group" "dataproc-security-group" {
 }
 
 resource "yandex_iam_service_account" "dataproc-sa" {
-  description = "Service account to manage the Data Proc clusters"
+  description = "Service account to manage the Yandex Data Processing clusters"
   name        = local.sa_name
 }
 
-# Assign the dataproc.agent role to the Data Proc service account
+# Assign the dataproc.agent role to the Yandex Data Processing service account
 resource "yandex_resourcemanager_folder_iam_binding" "dataproc-agent" {
   folder_id = local.folder_id
   role      = "dataproc.agent"
   members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
 }
 
-# Assign the dataproc.provisioner role to the Data Proc service account
+# Assign the dataproc.provisioner role to the Yandex Data Processing service account
 resource "yandex_resourcemanager_folder_iam_binding" "dataproc-provisioner" {
   folder_id = local.folder_id
   role      = "dataproc.provisioner"
   members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
 }
 
-# Assign the storage.admin role to the Data Proc service account
+# Assign the storage.admin role to the Yandex Data Processing service account
 resource "yandex_resourcemanager_folder_iam_binding" "storage-admin" {
   folder_id = local.folder_id
   role      = "storage.admin"
@@ -166,7 +166,7 @@ resource "yandex_storage_bucket" "dataproc-bucket" {
 }
 
 resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
-  description        = "Data Proc source cluster"
+  description        = "Yandex Data Processing source cluster"
   depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent,yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
   bucket             = yandex_storage_bucket.dataproc-bucket.id
   security_group_ids = [yandex_vpc_security_group.dataproc-security-group.id]
@@ -182,7 +182,7 @@ resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
       services        = ["HDFS", "HIVE", "SPARK", "YARN", "ZEPPELIN"]
       ssh_public_keys = [file(local.dp_ssh_key)]
       properties = {
-        # For running PySpark jobs when Data Proc is integrated with Metastore
+        # For running PySpark jobs when Yandex Data Processing is integrated with Metastore
         "spark:spark.sql.hive.metastore.sharedPrefixes" = "com.amazonaws,ru.yandex.cloud"
       }
     }
@@ -215,7 +215,7 @@ resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
 }
 
 resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
-  description        = "Data Proc target cluster"
+  description        = "Yandex Data Processing target cluster"
   depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent,yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
   bucket             = yandex_storage_bucket.dataproc-bucket.id
   security_group_ids = [yandex_vpc_security_group.dataproc-security-group.id]
@@ -231,7 +231,7 @@ resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
       services        = ["HDFS", "HIVE", "SPARK", "YARN", "ZEPPELIN"]
       ssh_public_keys = [file(local.dp_ssh_key)]
       properties = {
-        # For running PySpark jobs when Data Proc is integrated with Metastore
+        # For running PySpark jobs when Yandex Data Processing is integrated with Metastore
         "spark:spark.sql.hive.metastore.sharedPrefixes" = "com.amazonaws,ru.yandex.cloud"
       }
     }
