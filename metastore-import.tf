@@ -15,7 +15,7 @@ locals {
   nat_name             = "dataproc-nat" # Name of the NAT gateway
   subnet_name          = "dataproc-subnet-a" # Name of the subnet
   sa_name              = "dataproc-s3-sa" # Name of the service account
-  os_sa_name           = "sa-for-obj-storage" # Name of the service account for Object Storage creating
+  os_sa_name           = "sa-for-obj-storage" # Name of the service account for managing Object Storage bucket and bucket's ACLs
   dataproc_source_name = "dataproc-source" # Name of the Yandex Data Processing source cluster
   dataproc_target_name = "dataproc-target" # Name of the Yandex Data Processing target cluster
   bucket_name          = "dataproc-bucket" # Name of the Object Storage bucket
