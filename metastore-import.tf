@@ -15,6 +15,7 @@ locals {
   nat_name             = "dataproc-nat" # Name of the NAT gateway
   subnet_name          = "dataproc-subnet-a" # Name of the subnet
   sa_name              = "dataproc-s3-sa" # Name of the service account
+  os_sa_name           = "sa-for-obj-storage" # Name of the service account for managing Object Storage bucket and bucket's ACLs
   dataproc_source_name = "dataproc-source" # Name of the Yandex Data Processing source cluster
   dataproc_target_name = "dataproc-target" # Name of the Yandex Data Processing target cluster
   bucket_name          = "dataproc-bucket" # Name of the Object Storage bucket
@@ -60,13 +61,6 @@ resource "yandex_vpc_security_group" "dataproc-security-group" {
     from_port         = 0
     to_port           = 65535
     predefined_target = "self_security_group"
-  }
-
-  ingress {
-    description    = "Allow access to NTP servers for time syncing"
-    protocol       = "UDP"
-    port           = 123
-    v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
@@ -140,15 +134,34 @@ resource "yandex_resourcemanager_folder_iam_binding" "dataproc-provisioner" {
   members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
 }
 
+# Create a service account for Object Storage creation
+resource "yandex_iam_service_account" "sa-for-obj-storage" {
+  folder_id = local.folder_id
+  name      = local.os_sa_name
+}
+
 # Assign the storage.admin role to the Yandex Data Processing service account
 resource "yandex_resourcemanager_folder_iam_binding" "storage-admin" {
   folder_id = local.folder_id
   role      = "storage.admin"
-  members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
+  members   = ["serviceAccount:${yandex_iam_service_account.sa-for-obj-storage.id}"]
 }
 
+resource "yandex_iam_service_account_static_access_key" "sa-static-key" {
+  description        = "Static access key for Object Storage"
+  service_account_id = yandex_iam_service_account.sa-for-obj-storage.id
+}
+
+# Use the key to create a bucket and grant permission to the service account in order to read from the bucket and write to it
 resource "yandex_storage_bucket" "dataproc-bucket" {
+  access_key = yandex_iam_service_account_static_access_key.sa-static-key.access_key
+  secret_key = yandex_iam_service_account_static_access_key.sa-static-key.secret_key
   bucket     = local.bucket_name
+
+  depends_on = [
+    yandex_resourcemanager_folder_iam_binding.storage-admin
+  ]
+
   grant {
     id = yandex_iam_service_account.dataproc-sa.id
     type        = "CanonicalUser"
