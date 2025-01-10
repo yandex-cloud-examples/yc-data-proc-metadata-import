@@ -233,7 +233,7 @@ resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
 
     hadoop {
       services        = ["HDFS", "HIVE", "SPARK", "YARN", "ZEPPELIN"]
-      ssh_public_keys = ["${file(local.dp_ssh_key)}"]
+      ssh_public_keys = [file(local.dp_ssh_key)]
       properties = {
         # For running PySpark jobs when Yandex Data Processing is integrated with Metastore
         "spark:spark.sql.hive.metastore.sharedPrefixes" = "com.amazonaws,ru.yandex.cloud"
