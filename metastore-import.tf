@@ -11,14 +11,15 @@ locals {
   dp_ssh_key = "" # Аbsolute path to an SSH public key for the Yandex Data Processing clusters
 
   # The following settings are predefined. Change them only if necessary.
-  network_name         = "dataproc-network" # Name of the network
-  nat_name             = "dataproc-nat" # Name of the NAT gateway
-  subnet_name          = "dataproc-subnet-a" # Name of the subnet
-  sa_name              = "dataproc-s3-sa" # Name of the service account
-  os_sa_name           = "sa-for-obj-storage" # Name of the service account for managing Object Storage bucket and bucket's ACLs
-  dataproc_source_name = "dataproc-source" # Name of the Yandex Data Processing source cluster
-  dataproc_target_name = "dataproc-target" # Name of the Yandex Data Processing target cluster
-  bucket_name          = "dataproc-bucket" # Name of the Object Storage bucket
+  network_name         = "dataproc-network"        # Name of the network
+  nat_name             = "dataproc-nat"            # Name of the NAT gateway
+  subnet_name          = "dataproc-subnet"         # Name of the subnet
+  security-group-name  = "dataproc-security-group" # Name of the security group
+  sa_name              = "dataproc-s3-sa"          # Name of the service account
+  os_sa_name           = "sa-for-obj-storage"      # Name of the service account for managing Object Storage bucket and bucket's ACLs
+  dataproc_source_name = "dataproc-source"         # Name of the Yandex Data Processing source cluster
+  dataproc_target_name = "dataproc-target"         # Name of the Yandex Data Processing target cluster
+  bucket_name          = "dataproc-bucket"         # Name of the Object Storage bucket
 }
 
 resource "yandex_vpc_network" "dataproc_network" {
@@ -42,7 +43,7 @@ resource "yandex_vpc_route_table" "dataproc_rt" {
   }
 }
 
-resource "yandex_vpc_subnet" "dataproc_subnet-a" {
+resource "yandex_vpc_subnet" "dataproc_subnet" {
   description    = "Subnet for Yandex Data Processing and Metastore"
   name           = local.subnet_name
   zone           = "ru-central1-a"
@@ -53,6 +54,7 @@ resource "yandex_vpc_subnet" "dataproc_subnet-a" {
 
 resource "yandex_vpc_security_group" "dataproc-security-group" {
   description = "Security group for the Yandex Data Processing clusters"
+  name        = local.security-group-name
   network_id  = yandex_vpc_network.dataproc_network.id
 
   ingress {
@@ -116,7 +118,7 @@ resource "yandex_vpc_security_group" "dataproc-security-group" {
 }
 
 resource "yandex_iam_service_account" "dataproc-sa" {
-  description = "Service account to manage the Yandex Data Processing clusters"
+  description = "Service account to manage the Yandex Data Processing and Metastore clusters"
   name        = local.sa_name
 }
 
@@ -131,6 +133,13 @@ resource "yandex_resourcemanager_folder_iam_binding" "dataproc-agent" {
 resource "yandex_resourcemanager_folder_iam_binding" "dataproc-provisioner" {
   folder_id = local.folder_id
   role      = "dataproc.provisioner"
+  members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
+}
+
+# Assign the managed-metastore.integrationProvider role to the Metastore service account
+resource "yandex_resourcemanager_folder_iam_binding" "metastore-integration-provider" {
+  folder_id = local.folder_id
+  role      = "managed-metastore.integrationProvider"
   members   = ["serviceAccount:${yandex_iam_service_account.dataproc-sa.id}"]
 }
 
@@ -163,7 +172,7 @@ resource "yandex_storage_bucket" "dataproc-bucket" {
   ]
 
   grant {
-    id = yandex_iam_service_account.dataproc-sa.id
+    id          = yandex_iam_service_account.dataproc-sa.id
     type        = "CanonicalUser"
     permissions = ["READ", "WRITE"]
   }
@@ -171,7 +180,7 @@ resource "yandex_storage_bucket" "dataproc-bucket" {
 
 resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
   description        = "Yandex Data Processing source cluster"
-  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent,yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
+  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent, yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
   bucket             = yandex_storage_bucket.dataproc-bucket.id
   security_group_ids = [yandex_vpc_security_group.dataproc-security-group.id]
   name               = local.dataproc_source_name
@@ -199,7 +208,7 @@ resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
         disk_type_id       = "network-hdd"
         disk_size          = 20 # GB
       }
-      subnet_id        = yandex_vpc_subnet.dataproc_subnet-a.id
+      subnet_id        = yandex_vpc_subnet.dataproc_subnet.id
       hosts_count      = 1
       assign_public_ip = true
     }
@@ -212,7 +221,7 @@ resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
         disk_type_id       = "network-hdd"
         disk_size          = 20 # GB
       }
-      subnet_id   = yandex_vpc_subnet.dataproc_subnet-a.id
+      subnet_id   = yandex_vpc_subnet.dataproc_subnet.id
       hosts_count = 1
     }
   }
@@ -220,7 +229,7 @@ resource "yandex_dataproc_cluster" "dataproc-source-cluster" {
 
 resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
   description        = "Yandex Data Processing target cluster"
-  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent,yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
+  depends_on         = [yandex_resourcemanager_folder_iam_binding.dataproc-agent, yandex_resourcemanager_folder_iam_binding.dataproc-provisioner]
   bucket             = yandex_storage_bucket.dataproc-bucket.id
   security_group_ids = [yandex_vpc_security_group.dataproc-security-group.id]
   name               = local.dataproc_target_name
@@ -248,7 +257,7 @@ resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
         disk_type_id       = "network-hdd"
         disk_size          = 20 # GB
       }
-      subnet_id        = yandex_vpc_subnet.dataproc_subnet-a.id
+      subnet_id        = yandex_vpc_subnet.dataproc_subnet.id
       hosts_count      = 1
       assign_public_ip = true
     }
@@ -261,7 +270,7 @@ resource "yandex_dataproc_cluster" "dataproc-target-cluster" {
         disk_type_id       = "network-hdd"
         disk_size          = 20 # GB
       }
-      subnet_id   = yandex_vpc_subnet.dataproc_subnet-a.id
+      subnet_id   = yandex_vpc_subnet.dataproc_subnet.id
       hosts_count = 1
     }
   }
