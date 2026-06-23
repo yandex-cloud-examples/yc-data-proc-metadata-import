@@ -161,7 +161,7 @@ resource "yandex_iam_service_account_static_access_key" "sa-static-key" {
   service_account_id = yandex_iam_service_account.sa-for-obj-storage.id
 }
 
-# Use the key to create a bucket and grant permission to the service account in order to read from the bucket and write to it
+# Use the key to create a bucket
 resource "yandex_storage_bucket" "dataproc-bucket" {
   access_key = yandex_iam_service_account_static_access_key.sa-static-key.access_key
   secret_key = yandex_iam_service_account_static_access_key.sa-static-key.secret_key
@@ -170,6 +170,13 @@ resource "yandex_storage_bucket" "dataproc-bucket" {
   depends_on = [
     yandex_resourcemanager_folder_iam_binding.storage-admin
   ]
+}
+
+# Grant permissions to the service account in order to read from the bucket and write to it
+resource "yandex_storage_bucket_grant" "dataproc-bucket-grant" {
+  bucket     = yandex_storage_bucket.dataproc-bucket.bucket
+  access_key = yandex_iam_service_account_static_access_key.sa-static-key.access_key
+  secret_key = yandex_iam_service_account_static_access_key.sa-static-key.secret_key
 
   grant {
     id          = yandex_iam_service_account.dataproc-sa.id
